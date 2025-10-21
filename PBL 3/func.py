@@ -1,5 +1,6 @@
 import os 
-from collections import defaultdict # Mantido para o agrupamento de relatórios
+import datetime # Adicionado para manipulação de datas nas estatísticas
+from collections import defaultdict # Para agrupar movimentações por categoria
 
 # --- Configuração de Sistema ---
 
@@ -8,15 +9,13 @@ if os.name == "nt":
 else:
     comando_limpar = "clear"
 
-# Lista global onde cada item é um dicionário.
-# **A PERSISTÊNCIA AGORA É APENAS EM MEMÓRIA**
+# Lista global (os dados são armazenados APENAS EM MEMÓRIA)
 movimentacoes = [] 
 
 # ==========================================================
 # 1. FUNÇÕES DE PERSISTÊNCIA (REMOVIDAS / SIMPLIFICADAS)
-#    As funções de DB foram removidas. Os dados são salvos
-#    diretamente na lista 'movimentacoes' e PERDEM-SE
-#    ao fechar o programa.
+#    Todas as funções de SQLite (inicializar_db, salvar_movimentacao_no_db,
+#    carregar_dados_do_db, limpar_tabela) foram removidas para simplificar.
 # ==========================================================
 
 
@@ -90,6 +89,7 @@ def registrar_movimentacao():
         return  
     
     categoria = input("Categoria (ex: Salário, Alimentação, Transporte): ").strip()
+    # Pede a data no formato DD/MM/AAAA para facilitar o cálculo mensal
     data = input("Data da Transação (DD/MM/AAAA): ")
 
     valor_formatado = f"{valor:.2f}"
@@ -97,12 +97,12 @@ def registrar_movimentacao():
     nova_transacao = {
         "tipo": tipo_completo,
         "descricao": descricao,
-        "valor": valor_formatado, # String formatada
+        "valor": valor_formatado, # Valor como string formatada
         "categoria": categoria,
         "data": data,
     }
 
-    # **MUDANÇA CRÍTICA:** Adiciona à lista diretamente, sem DB.
+    # Adiciona à lista diretamente.
     movimentacoes.append(nova_transacao)
     
     print("\n✅ Movimentação Registrada com Sucesso (Memória)! (Será perdida ao fechar o programa)")
@@ -136,6 +136,7 @@ def acompanhar_saldo():
     print(f"Total de Receitas: R${total_receitas:.2f}")
     print(f"Total de Despesas: R${total_despesas:.2f}")
 
+    # Exibição colorida (se o terminal suportar)
     cor_inicio = "\033[92m" if saldo_total >= 0 else "\033[91m"
     cor_fim = "\033[0m"
 
@@ -146,7 +147,7 @@ def acompanhar_saldo():
 
 
 # ==========================================================
-# 4. FUNÇÕES DE RELATÓRIO E ANÁLISE (DB AUXILIAR REMOVIDO)
+# 4. FUNÇÕES DE RELATÓRIO E ANÁLISE (COMPLETAS)
 # ==========================================================
 
 def relatorios_e_analises_menu():
@@ -163,7 +164,7 @@ def relatorios_e_analises_menu():
 --- SUB-MENU DE RELATÓRIOS E ANÁLISES ---
 Escolha o tipo de análise:
     (1): Relatório Detalhado por Categoria
-    (2): Estatísticas Mensais (Ainda a Implementar)
+    (2): Estatísticas Mensais (Médias)
     (3): Voltar ao Menu Principal
 -----------------------------------------""")
         
@@ -177,8 +178,7 @@ Escolha o tipo de análise:
             case 1:
                 relatorio_por_categoria() 
             case 2:
-                print("\nFunção de Estatísticas ainda a ser implementada.")
-                _ = input("Pressione qualquer botão para continuar.")
+                gerar_estatisticas() 
             case 3:
                 return 
             case _:
@@ -224,7 +224,6 @@ def relatorio_por_categoria():
 
         # Exibição dos Registros
         for mov in lista_de_movs:
-            # Dados são lidos diretamente do dicionário (mov)
             larg_tip = str(mov['tipo']).center(larg)
             larg_des = str(mov['descricao']).center(larg)
             
@@ -239,5 +238,60 @@ def relatorio_por_categoria():
         
         print("-" * tamanho_cabecalho + "\n")
 
-    # Ponto de parada necessário para o utilizador ler o relatório
     _ = input("Relatórios concluídos. Pressione qualquer botão para voltar ao menu de Análises.")
+
+
+def gerar_estatisticas():
+    """Calcula e exibe as médias de receitas e despesas mensais (Requisito: Estatísticas)."""
+    _ = os.system(comando_limpar)
+    print("--- ESTATÍSTICAS FINANCEIRAS (MÉDIAS MENSAIS) ---")
+
+    # Dicionário para armazenar totais por mês/ano: {'MM/AAAA': {'receita': X, 'despesa': Y}}
+    totais_mensais = defaultdict(lambda: {'receita': 0.0, 'despesa': 0.0})
+    
+    # 1. Agrupamento e Soma por Mês
+    for mov in movimentacoes:
+        try:
+            # Converte a data (DD/MM/AAAA) e extrai o mês/ano
+            data_obj = datetime.datetime.strptime(mov['data'], '%d/%m/%Y')
+            mes_ano = data_obj.strftime('%m/%Y')
+            valor = float(mov['valor'])
+            
+            if mov['tipo'] == 'Receita':
+                totais_mensais[mes_ano]['receita'] += valor
+            elif mov['tipo'] == 'Despesa':
+                totais_mensais[mes_ano]['despesa'] += valor
+        except ValueError:
+            # Ignora movimentações com formato de data ou valor inválido
+            continue
+
+    if not totais_mensais:
+        print("\n🚫 Não há dados válidos para calcular as estatísticas.")
+        _ = input("Pressione qualquer botão para voltar ao menu de Análises.")
+        return
+
+    # 2. Cálculo das Médias
+    total_meses = len(totais_mensais)
+    total_receita_geral = sum(d['receita'] for d in totais_mensais.values())
+    total_despesa_geral = sum(d['despesa'] for d in totais_mensais.values())
+
+    media_receita = total_receita_geral / total_meses
+    media_despesa = total_despesa_geral / total_meses
+
+    # 3. Exibição
+    print(f"\nPeríodo de Análise (Meses Únicos): {total_meses}")
+    print("-------------------------------------------------")
+    print(f"Total Acumulado de Receitas: R${total_receita_geral:.2f}")
+    print(f"Total Acumulado de Despesas: R${total_despesa_geral:.2f}")
+    print("-------------------------------------------------")
+    print(f"MÉDIA DE RECEITA MENSAL: R${media_receita:.2f}")
+    print(f"MÉDIA DE DESPESA MENSAL: R${media_despesa:.2f}")
+    
+    saldo_medio = media_receita - media_despesa
+    cor_inicio = "\033[92m" if saldo_medio >= 0 else "\033[91m"
+    cor_fim = "\033[0m"
+    print(f"SALDO MÉDIO MENSAL:      {cor_inicio}R${saldo_medio:.2f}{cor_fim}")
+    print("-------------------------------------------------")
+
+
+    _ = input("Pressione qualquer botão para voltar ao menu de Análises.")
