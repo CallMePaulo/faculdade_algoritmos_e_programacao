@@ -289,12 +289,15 @@ def relatorios():
             print('-' * tamanho_cabecalho)
 
             # Exibição dos Registros
+            # Exibição dos Registros
+           # Exibição dos Registros
             for registro in dados:
                 # Registro: (tipo, descricao, valor, data)
                 larg_tip = str(registro[0]).center(larg)
                 larg_des = str(registro[1]).center(larg)
                 
-                # Formatação do valor para R$XX.XX
+                # CORREÇÃO: Formatação do valor para R$XX.XX e centralização
+                # Esta é a parte que resolve o seu SyntaxError e garante a formatação.
                 valor_formatado = f"R${registro[2]:.2f}"
                 larg_val = valor_formatado.center(larg)
                 
